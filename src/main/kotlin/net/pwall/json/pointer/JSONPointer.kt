@@ -25,16 +25,30 @@
 
 package net.pwall.json.pointer
 
+import java.net.URLDecoder
+import java.net.URLEncoder
+
 import net.pwall.json.JSONArray
 import net.pwall.json.JSONObject
 import net.pwall.json.JSONValue
 import net.pwall.util.CharUnmapper
 import net.pwall.util.Strings
 
+/**
+ * A class to represent a [JavaScript Object Notation (JSON) Pointer](https://tools.ietf.org/html/rfc6901).
+ *
+ * @author  Peter Wall
+ */
 class JSONPointer private constructor(private val tokens: List<String>) {
 
     constructor(string: String) : this(parse(string))
 
+    /**
+     * Evaluate the pointer against a JSON value, returning the value pointed to.
+     *
+     * @param   base    the base JSON value for the pointer operations
+     * @return          the value pointed to
+     */
     fun eval(base: JSONValue?): JSONValue? {
         var result = base
         for (i in tokens.indices) {
@@ -42,7 +56,7 @@ class JSONPointer private constructor(private val tokens: List<String>) {
             when (result) {
                 is JSONObject -> {
                     if (!result.containsKey(token))
-                        throw JSONPointerException("Can't resolve JSON Pointer ${toString(i + 1)}")
+                        error(i + 1)
                     result = result[token]
                 }
                 is JSONArray -> {
@@ -53,12 +67,18 @@ class JSONPointer private constructor(private val tokens: List<String>) {
                         throw JSONPointerException("Array index out of range in JSON Pointer ${toString(i + 1)}")
                     result = result[index]
                 }
-                else -> throw JSONPointerException("Can't resolve JSON Pointer ${toString(i + 1)}")
+                else -> error(i + 1)
             }
         }
         return result
     }
 
+    /**
+     * Test whether the pointer points to a value in a given base value.
+     *
+     * @param   base    the base JSON value for the pointer operations
+     * @return          `true` if the pointer points to a valid value in the base value
+     */
     fun exists(base: JSONValue?): Boolean {
         var current = base
         for (token in tokens) {
@@ -95,8 +115,7 @@ class JSONPointer private constructor(private val tokens: List<String>) {
     }
 
     fun insert(base: JSONValue, newValue: JSONValue?): JSONValue {
-        if (tokens.isEmpty())
-            throw JSONPointerException("Can't insert using root JSON Pointer")
+        checkRoot("insert")
         return insertInto(0, base, newValue)
     }
 
@@ -108,7 +127,7 @@ class JSONPointer private constructor(private val tokens: List<String>) {
             return when (base) {
                 is JSONObject -> {
                     if (!base.containsKey(token))
-                        throw JSONPointerException("Can't resolve JSON Pointer ${toString(index + 1)}")
+                        error(index + 1)
                     JSONObject(base).apply {
                         set(token, insertInto(index + 1, base[token], newValue))
                     }
@@ -124,7 +143,7 @@ class JSONPointer private constructor(private val tokens: List<String>) {
                         set(childIndex, insertInto(index + 1, base[childIndex], newValue))
                     }
                 }
-                else -> throw JSONPointerException("Can't resolve JSON Pointer ${toString(index + 1)}")
+                else -> error(index + 1)
             }
         }
         return when (base) {
@@ -157,8 +176,7 @@ class JSONPointer private constructor(private val tokens: List<String>) {
     }
 
     fun remove(base: JSONValue): JSONValue {
-        if (tokens.isEmpty())
-            throw JSONPointerException("Can't remove using root JSON Pointer")
+        checkRoot("remove")
         return removeFrom(0, base)
     }
 
@@ -170,7 +188,7 @@ class JSONPointer private constructor(private val tokens: List<String>) {
             return when (base) {
                 is JSONObject -> {
                     if (!base.containsKey(token))
-                        throw JSONPointerException("Can't resolve JSON Pointer ${toString(index + 1)}")
+                        error(index + 1)
                     JSONObject(base).apply {
                         set(token, removeFrom(index + 1, base[token]))
                     }
@@ -186,13 +204,13 @@ class JSONPointer private constructor(private val tokens: List<String>) {
                         set(childIndex, removeFrom(index + 1, base[childIndex]))
                     }
                 }
-                else -> throw JSONPointerException("Can't resolve JSON Pointer ${toString(index + 1)}")
+                else -> error(index + 1)
             }
         }
         return when (base) {
             is JSONObject -> {
                 if (!base.containsKey(token))
-                    throw JSONPointerException("Can't resolve JSON Pointer $this")
+                    error(tokens.size)
                 JSONObject(base).apply {
                     remove(token)
                 }
@@ -213,8 +231,7 @@ class JSONPointer private constructor(private val tokens: List<String>) {
     }
 
     fun replace(base: JSONValue, newValue: JSONValue?): JSONValue {
-        if (tokens.isEmpty())
-            throw JSONPointerException("Can't replace using root JSON Pointer")
+        checkRoot("replace")
         return replaceWithin(0, base, newValue)
     }
 
@@ -226,7 +243,7 @@ class JSONPointer private constructor(private val tokens: List<String>) {
             return when (base) {
                 is JSONObject -> {
                     if (!base.containsKey(token))
-                        throw JSONPointerException("Can't resolve JSON Pointer ${toString(index + 1)}")
+                        error(index + 1)
                     JSONObject(base).apply {
                         set(token, replaceWithin(index + 1, base[token], newValue))
                     }
@@ -242,7 +259,7 @@ class JSONPointer private constructor(private val tokens: List<String>) {
                         set(childIndex, replaceWithin(index + 1, base[childIndex], newValue))
                     }
                 }
-                else -> throw JSONPointerException("Can't resolve JSON Pointer ${toString(index + 1)}")
+                else -> error(index + 1)
             }
         }
         return when (base) {
@@ -268,7 +285,9 @@ class JSONPointer private constructor(private val tokens: List<String>) {
         }
     }
 
-    fun toString(n: Int) = tokens.subList(0, n).joinToString(separator = "") { "/${escapeToken(it)}" }
+    fun toURIFragment() = "#${tokens.joinToString(separator = "") { "/${encodeURI(escapeToken(it))}" }}"
+
+    private fun toString(n: Int) = tokens.subList(0, n).joinToString(separator = "") { "/${escapeToken(it)}" }
 
     override fun toString() = toString(tokens.size)
 
@@ -276,13 +295,24 @@ class JSONPointer private constructor(private val tokens: List<String>) {
 
     override fun hashCode() = tokens.hashCode()
 
+    private fun checkRoot(op: String) {
+        if (tokens.isEmpty())
+            throw JSONPointerException("Can't $op using root JSON Pointer")
+    }
+
     private fun checkIndex(token: String, lazyMessage: () -> String): Int {
         if (!(numberRegex matches token))
             throw JSONPointerException(lazyMessage())
         return token.toInt()
     }
 
+    private fun error(tokenIndex: Int): Nothing {
+        throw JSONPointerException("Can't resolve JSON Pointer ${toString(tokenIndex)}")
+    }
+
     companion object {
+
+        val root = JSONPointer(emptyList())
 
         val numberRegex = Regex("^(0|[1-9][0-9]{0,8})$")
 
@@ -305,6 +335,19 @@ class JSONPointer private constructor(private val tokens: List<String>) {
         }
 
         fun unescapeToken(str: String): String = Strings.unescape(str, Unmapper)
+
+        fun encodeURI(str: String): String {
+            val encoded = URLEncoder.encode(str, Charsets.UTF_8.name())
+            // Unfortunately, the Java URLEncoder class does not encode according to the specification;
+            // it incorrectly encodes ~, it fails to encode * and it encodes space as + instead of %20.
+            return encoded.replace("%7E", "~").replace("*", "%2A").replace("+", "%20")
+        }
+
+        fun fromURIFragment(fragment: String): JSONPointer {
+            if (!fragment.startsWith('#'))
+                throw JSONPointerException("Illegal URI fragment $fragment")
+            return JSONPointer(URLDecoder.decode(fragment.substring(1), Charsets.UTF_8.name()))
+        }
 
         infix fun JSONValue.locate(pointer: JSONPointer) = pointer.eval(this)
 

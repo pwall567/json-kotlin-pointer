@@ -50,6 +50,7 @@ class JSONPointerTest {
         expect(JSONInteger(4)) { JSONPointer("/g|h").eval(document) }
         expect(JSONInteger(5)) { JSONPointer("/i\\j").eval(document) }
         expect(JSONInteger(6)) { JSONPointer("/k\"l").eval(document) }
+        expect(JSONInteger(7)) { JSONPointer("/ ").eval(document) }
         expect(JSONInteger(8)) { JSONPointer("/m~0n").eval(document) }
     }
 
@@ -64,6 +65,7 @@ class JSONPointerTest {
         expect(JSONInteger(4)) { document locate JSONPointer("/g|h") }
         expect(JSONInteger(5)) { document locate JSONPointer("/i\\j") }
         expect(JSONInteger(6)) { document locate JSONPointer("/k\"l") }
+        expect(JSONInteger(7)) { document locate JSONPointer("/ ") }
         expect(JSONInteger(8)) { document locate JSONPointer("/m~0n") }
     }
 
@@ -78,6 +80,7 @@ class JSONPointerTest {
         expect(JSONInteger(4)) { document locate "/g|h" }
         expect(JSONInteger(5)) { document locate "/i\\j" }
         expect(JSONInteger(6)) { document locate "/k\"l" }
+        expect(JSONInteger(7)) { document locate "/ " }
         expect(JSONInteger(8)) { document locate "/m~0n" }
     }
 
@@ -92,7 +95,42 @@ class JSONPointerTest {
         expect("/g|h") { JSONPointer("/g|h").toString() }
         expect("/i\\j") { JSONPointer("/i\\j").toString() }
         expect("/k\"l") { JSONPointer("/k\"l").toString() }
+        expect("/ ") { JSONPointer("/ ").toString() }
         expect("/m~0n") { JSONPointer("/m~0n").toString() }
+    }
+
+    @Test fun `should create correct URI fragment`() {
+        expect("#") { JSONPointer("").toURIFragment() }
+        expect("#/foo") { JSONPointer("/foo").toURIFragment() }
+        expect("#/foo/0") { JSONPointer("/foo/0").toURIFragment() }
+        expect("#/") { JSONPointer("/").toURIFragment() }
+        expect("#/a~1b") { JSONPointer("/a~1b").toURIFragment() }
+        expect("#/c%25d") { JSONPointer("/c%d").toURIFragment() }
+        expect("#/e%5Ef") { JSONPointer("/e^f").toURIFragment() }
+        expect("#/g%7Ch") { JSONPointer("/g|h").toURIFragment() }
+        expect("#/i%5Cj") { JSONPointer("/i\\j").toURIFragment() }
+        expect("#/k%22l") { JSONPointer("/k\"l").toURIFragment() }
+        expect("#/%20") { JSONPointer("/ ").toURIFragment() }
+        expect("#/m~0n") { JSONPointer("/m~0n").toURIFragment() }
+        expect("#/o%2Ap") { JSONPointer("/o*p").toURIFragment() }
+        expect("#/q%2Br") { JSONPointer("/q+r").toURIFragment() }
+    }
+
+    @Test fun `should correctly decode URI fragment`() {
+        expect(JSONPointer("")) { JSONPointer.fromURIFragment("#") }
+        expect(JSONPointer("/foo")) { JSONPointer.fromURIFragment("#/foo") }
+        expect(JSONPointer("/foo/0")) { JSONPointer.fromURIFragment("#/foo/0") }
+        expect(JSONPointer("/")) { JSONPointer.fromURIFragment("#/") }
+        expect(JSONPointer("/a~1b")) { JSONPointer.fromURIFragment("#/a~1b") }
+        expect(JSONPointer("/c%d")) { JSONPointer.fromURIFragment("#/c%25d") }
+        expect(JSONPointer("/e^f")) { JSONPointer.fromURIFragment("#/e%5Ef") }
+        expect(JSONPointer("/g|h")) { JSONPointer.fromURIFragment("#/g%7Ch") }
+        expect(JSONPointer("/i\\j")) { JSONPointer.fromURIFragment("#/i%5Cj") }
+        expect(JSONPointer("/k\"l")) { JSONPointer.fromURIFragment("#/k%22l") }
+        expect(JSONPointer("/ ")) { JSONPointer.fromURIFragment("#/%20") }
+        expect(JSONPointer("/m~0n")) { JSONPointer.fromURIFragment("#/m~0n") }
+        expect(JSONPointer("/o*p")) { JSONPointer.fromURIFragment("#/o%2Ap") }
+        expect(JSONPointer("/q+r")) { JSONPointer.fromURIFragment("#/q%2Br") }
     }
 
     @Test fun `should test whether pointer exists or not`() {
@@ -124,6 +162,10 @@ class JSONPointerTest {
     @Test fun `should give correct error message on bad reference`() {
         val errorMessage = assertFailsWith<JSONPointerException> { JSONPointer("/wrong/0").eval(document) }
         expect("Can't resolve JSON Pointer /wrong") { errorMessage.message }
+    }
+
+    @Test fun `should return valid root pointer`() {
+        expect(JSONPointer("")) { JSONPointer.root }
     }
 
     companion object {

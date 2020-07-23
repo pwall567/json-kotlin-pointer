@@ -1,10 +1,10 @@
 # json-kotlin-pointer
 
-Kotlin implementation of [JSON Pointer](https://tools.ietf.org/html/rfc6901).
+Kotlin implementation of [JavaScript Object Notation (JSON) Pointer](https://tools.ietf.org/html/rfc6901).
 
 ## Quick Start
 
-The library uses the JSON classes from the [jsonutil](https://github.com/pwall567/jsonutil) library.
+This library uses the JSON classes from the [jsonutil](https://github.com/pwall567/jsonutil) library.
 The examples below assume the existence of a `JSONObject` similar to the one created as follows:
 ```kotlin
     val json = JSON.parseObject("""{"list":[{"aaa":1},{"aaa":2}]}""")
@@ -25,6 +25,10 @@ To use the pointer, all of the following three forms are equivalent:
 ```
 ```kotlin
     val result = json locate "/list/0"
+```
+ In each case, `result` will contain the `JSONObject` representing the nested object:
+ ```json
+{"aaa":1}
 ```
  
 More information to follow.
