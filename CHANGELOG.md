@@ -2,7 +2,7 @@
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/).
 
-## [Unreleased]
+## [0.2] - 2020-07-23
 ### Changed
 - `JSONPointer`: added KDoc, minor code improvements
 - `JSONPointer`: added `root`
